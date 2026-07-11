@@ -1,0 +1,12 @@
+name = "wallpaper-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wallpaper-manifest"
+database_id = "daa13629-38ec-4eaf-ad2c-d99e5a4e8f86"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "wallpapers"
