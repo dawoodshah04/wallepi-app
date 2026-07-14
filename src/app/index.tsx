@@ -1,62 +1,100 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import DetailModal from '@/components/DetailModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import WallpaperGrid, { WallpaperItem } from '@/components/WallpaperGrid';
+import { Colors } from '@/constants/theme';
+import { getFavorites, saveFavorites } from '@/lib/favoritesStore';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+const CATEGORIES = ['All', 'Minimal', 'Nature', 'Dark', 'Abstract'];
 
 export default function HomeScreen() {
+  const searchParams = useLocalSearchParams<{ category?: string }>();
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedWallpaper, setSelectedWallpaper] = useState<WallpaperItem | null>(null);
+  const [favoritesList, setFavoritesList] = useState<WallpaperItem[]>([]);
+
+  // Sync route param category selection from ExploreScreen
+  useEffect(() => {
+    if (searchParams.category) {
+      setActiveCategory(searchParams.category.toLowerCase());
+    }
+  }, [searchParams.category]);
+
+  const loadFavorites = useCallback(() => {
+    getFavorites().then(setFavoritesList);
+  }, []);
+
+  // Sync favorites state whenever screen mounts or gains active focus
+  useFocusEffect(
+    useCallback(() => {
+      loadFavorites();
+    }, [loadFavorites])
+  );
+
+  const toggleFavorite = async (item: WallpaperItem) => {
+    let updated: WallpaperItem[];
+    if (favoritesList.some(f => f.id === item.id)) {
+      updated = favoritesList.filter(f => f.id !== item.id);
+    } else {
+      updated = [...favoritesList, item];
+    }
+    setFavoritesList(updated);
+    await saveFavorites(updated);
+  };
+
+  const insets = useSafeAreaInsets();
+
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      <View style={styles.safeArea}>
+        <View style={[styles.header, { paddingTop: insets.top > 0 ? insets.top + 8 : 16 }]}>
+          <ThemedText type="title">Wallepi</ThemedText>
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        {/* Scrollable Categories Tab Bar */}
+        <View style={styles.tabsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabsContainer}
+          >
+            {CATEGORIES.map((cat) => {
+              const catKey = cat.toLowerCase();
+              const isActive = activeCategory === catKey;
+              return (
+                <Pressable
+                  key={cat}
+                  style={[styles.tab, isActive && styles.activeTab]}
+                  onPress={() => setActiveCategory(catKey)}
+                >
+                  <Text style={[styles.tabText, isActive && styles.activeTabText]}>
+                    {cat}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        {/* Paginated Wallpaper Feed Grid */}
+        <WallpaperGrid
+          category={activeCategory}
+          onWallpaperPress={(item) => setSelectedWallpaper(item)}
+        />
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
+        {/* Detail Screen Overlay Modal */}
+        <DetailModal
+          item={selectedWallpaper}
+          visible={selectedWallpaper !== null}
+          onClose={() => setSelectedWallpaper(null)}
+          isFavorite={selectedWallpaper ? favoritesList.some(f => f.id === selectedWallpaper.id) : false}
+          onToggleFavorite={() => selectedWallpaper && toggleFavorite(selectedWallpaper)}
+        />
+      </View>
     </ThemedView>
   );
 }
@@ -64,35 +102,42 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#000',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  tabsWrapper: {
+    height: 48,
+    marginBottom: 8,
+  },
+  tabsContainer: {
+    paddingHorizontal: 20,
+    gap: 6,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: Colors.dark.backgroundElement,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
-  title: {
-    textAlign: 'center',
+  activeTab: {
+    backgroundColor: '#fff',
+    borderColor: '#fff',
   },
-  code: {
-    textTransform: 'uppercase',
+  tabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.dark.textSecondary,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  activeTabText: {
+    color: '#000',
   },
 });

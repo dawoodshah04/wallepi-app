@@ -5,7 +5,9 @@ import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 export interface Env {
   DB: D1Database;
   BUCKET: R2Bucket;
+  WORKER_URL: string;
 }
+
 
 // ── Database Row (what D1 returns) ──────────────────────────────────
 

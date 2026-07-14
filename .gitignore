@@ -41,3 +41,11 @@ example
 # generated native folders
 /ios
 /android
+
+# Cloudflare / Backend
+.wrangler/
+.tmp-thumbs/
+.dev.vars
+wallpaper_app_two_person_plan.md
+
+*.md

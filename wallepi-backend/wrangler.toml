@@ -2,6 +2,9 @@ name = "wallpaper-api"
 main = "src/index.ts"
 compatibility_date = "2024-09-01"
 
+[vars]
+WORKER_URL = "https://wallpaper-api.sudo-dawood.workers.dev"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "wallpaper-manifest"

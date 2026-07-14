@@ -1,31 +1,21 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type {
-  Env,
-  WallpaperRow,
-  WallpaperResponse,
-  PaginatedResponse,
-} from "./types.js";
-
-// ── App Setup ───────────────────────────────────────────────────────
+import type { Env, PaginatedResponse, WallpaperResponse, WallpaperRow } from "./types.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Enable CORS so the Expo app can call from any origin
 app.use("/*", cors());
 
-// ── Helpers ─────────────────────────────────────────────────────────
+function folderNormalize(val: string): string {
+  return val.trim().toLowerCase();
+}
 
-/**
- * Converts a D1 row into an API response, building image URLs
- * that point to our own worker's image proxy route.
- */
-function toResponse(row: WallpaperRow, baseUrl: string): WallpaperResponse {
+function toResponse(row: WallpaperRow, base: string): WallpaperResponse {
   return {
     id: row.id,
     filename: row.filename,
-    url_full: `${baseUrl}/api/images/${row.r2_key_full}`,
-    url_thumb: `${baseUrl}/api/images/${row.r2_key_thumb}`,
+    url_full: `${base}/api/images/${row.r2_key_full}`,
+    url_thumb: `${base}/api/images/${row.r2_key_thumb}`,
     width: row.width,
     height: row.height,
     file_size: row.file_size,
@@ -34,109 +24,69 @@ function toResponse(row: WallpaperRow, baseUrl: string): WallpaperResponse {
   };
 }
 
-function getBaseUrl(c: { req: { url: string } }): string {
-  const url = new URL(c.req.url);
-  return `${url.protocol}//${url.host}`;
-}
+app.get("/api/health", (c) => c.json({ ok: true, timestamp: new Date().toISOString() }));
 
-// ── Routes ──────────────────────────────────────────────────────────
-
-// Health check
-app.get("/api/health", (c) => {
-  return c.json({ ok: true, timestamp: new Date().toISOString() });
-});
-
-// List wallpapers (paginated)
+// List wallpapers — two D1 queries batched into one round trip
 app.get("/api/wallpapers", async (c) => {
   const page = Math.max(1, Number(c.req.query("page")) || 1);
   const limit = Math.min(50, Math.max(1, Number(c.req.query("limit")) || 20));
   const offset = (page - 1) * limit;
-  const baseUrl = getBaseUrl(c);
+  const category = c.req.query("category");
 
-  // Get total count
-  const countResult = await c.env.DB.prepare(
-    "SELECT COUNT(*) as count FROM wallpapers WHERE is_active = 1"
-  ).first<{ count: number }>();
+  let countStmt = c.env.DB.prepare("SELECT COUNT(*) as count FROM wallpapers WHERE is_active = 1");
+  let listStmt = c.env.DB.prepare("SELECT * FROM wallpapers WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?").bind(limit, offset);
 
-  const total = countResult?.count ?? 0;
+  if (category) {
+    countStmt = c.env.DB.prepare("SELECT COUNT(*) as count FROM wallpapers WHERE is_active = 1 AND category = ?").bind(folderNormalize(category));
+    listStmt = c.env.DB.prepare("SELECT * FROM wallpapers WHERE is_active = 1 AND category = ? ORDER BY created_at DESC LIMIT ? OFFSET ?").bind(folderNormalize(category), limit, offset);
+  }
 
-  // Get paginated rows
-  const { results } = await c.env.DB.prepare(
-    "SELECT * FROM wallpapers WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?"
-  )
-    .bind(limit, offset)
-    .all<WallpaperRow>();
+  const [countRes, listRes] = await c.env.DB.batch<WallpaperRow | { count: number }>([countStmt, listStmt]);
 
-  const data: WallpaperResponse[] = (results ?? []).map((row) =>
-    toResponse(row, baseUrl)
+  const total = (countRes?.results[0] as { count: number } | undefined)?.count ?? 0;
+  const data: WallpaperResponse[] = ((listRes?.results ?? []) as WallpaperRow[]).map((r) =>
+    toResponse(r, c.env.WORKER_URL)
   );
 
-  const response: PaginatedResponse<WallpaperResponse> = {
+  const body: PaginatedResponse<WallpaperResponse> = {
     data,
-    meta: {
-      page,
-      limit,
-      total,
-      total_pages: Math.ceil(total / limit),
-    },
+    meta: { page, limit, total, total_pages: Math.ceil(total / limit) },
   };
 
-  return c.json(response);
+  // ponytail: 60s CDN cache — bump if wallpapers upload rate drops further
+  return c.json(body, 200, { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" });
 });
 
-// Get single wallpaper by ID
+// Single wallpaper
 app.get("/api/wallpapers/:id", async (c) => {
-  const id = c.req.param("id");
-  const baseUrl = getBaseUrl(c);
-
   const row = await c.env.DB.prepare(
     "SELECT * FROM wallpapers WHERE id = ? AND is_active = 1"
-  )
-    .bind(id)
-    .first<WallpaperRow>();
+  ).bind(c.req.param("id")).first<WallpaperRow>();
 
-  if (!row) {
-    return c.json({ error: "Wallpaper not found", status: 404 }, 404);
-  }
+  if (!row) return c.json({ error: "Wallpaper not found" }, 404);
 
-  return c.json({ data: toResponse(row, baseUrl) });
-});
-
-// ── Image Proxy (serves images from R2) ─────────────────────────────
-// This means R2 doesn't need public access enabled.
-// URL pattern: /api/images/wallpapers/{id}/full.jpg
-//              /api/images/wallpapers/{id}/thumb.webp
-
-app.get("/api/images/*", async (c) => {
-  const r2Key = c.req.path.replace("/api/images/", "");
-
-  if (!r2Key) {
-    return c.json({ error: "Missing image key", status: 400 }, 400);
-  }
-
-  const object = await c.env.BUCKET.get(r2Key);
-
-  if (!object) {
-    return c.json({ error: "Image not found", status: 404 }, 404);
-  }
-
-  // Build response headers using R2's built-in metadata
-  const headers = new Headers() as unknown as import("@cloudflare/workers-types").Headers;
-  object.writeHttpMetadata(headers);
-  (headers as unknown as Headers).set("etag", object.httpEtag);
-  (headers as unknown as Headers).set("Cache-Control", "public, max-age=31536000, immutable");
-
-  return new Response(object.body as unknown as ReadableStream, {
-    headers: headers as unknown as Headers,
+  return c.json({ data: toResponse(row, c.env.WORKER_URL) }, 200, {
+    "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
   });
 });
 
-// ── 404 fallback ────────────────────────────────────────────────────
+// Image proxy — no public R2 access needed
+app.get("/api/images/*", async (c) => {
+  const r2Key = c.req.path.replace("/api/images/", "");
+  if (!r2Key) return c.json({ error: "Missing image key" }, 400);
 
-app.notFound((c) => {
-  return c.json({ error: "Not found", status: 404 }, 404);
+  const object = await c.env.BUCKET.get(r2Key);
+  if (!object) return c.json({ error: "Image not found" }, 404);
+
+  return new Response(object.body as unknown as ReadableStream, {
+    headers: {
+      "Content-Type": object.httpMetadata?.contentType ?? "image/jpeg",
+      "ETag": object.httpEtag,
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
 });
 
-// ── Export ───────────────────────────────────────────────────────────
+app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 export default app;

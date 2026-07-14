@@ -7,9 +7,12 @@ CREATE TABLE IF NOT EXISTS wallpapers (
     height      INTEGER NOT NULL,
     file_size   INTEGER NOT NULL,
     mime_type   TEXT NOT NULL DEFAULT 'image/jpeg',
+    category    TEXT NOT NULL DEFAULT 'uncategorized',
     is_active   INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_active     ON wallpapers(is_active);
 CREATE INDEX IF NOT EXISTS idx_created_at ON wallpapers(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_category   ON wallpapers(category);
+
