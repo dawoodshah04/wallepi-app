@@ -72,13 +72,10 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
       try {
         if (Platform.OS === 'android') {
           const contentUri = await getContentUriAsync(localUri);
-          await IntentLauncher.startActivityAsync('android.intent.action.ATTACH_DATA', {
+          await IntentLauncher.startActivityAsync('android.service.wallpaper.CROP_AND_SET_WALLPAPER', {
             data: contentUri,
             type: item.mime_type || 'image/*',
             flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
-            extra: {
-              mimeType: item.mime_type || 'image/*',
-            },
           });
         } else {
           if (await Sharing.isAvailableAsync()) {

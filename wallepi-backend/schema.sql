@@ -15,4 +15,5 @@ CREATE TABLE IF NOT EXISTS wallpapers (
 CREATE INDEX IF NOT EXISTS idx_active     ON wallpapers(is_active);
 CREATE INDEX IF NOT EXISTS idx_created_at ON wallpapers(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_category   ON wallpapers(category);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_filename ON wallpapers(filename);
 

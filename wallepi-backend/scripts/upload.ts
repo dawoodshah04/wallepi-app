@@ -45,6 +45,7 @@ const MIME_TYPES: Record<string, string> = {
 interface UploadStats {
   uploaded: number;
   skippedLandscape: number;
+  skippedDuplicate: number;
   skippedError: number;
   total: number;
 }
@@ -73,6 +74,18 @@ function runWrangler(args: string): boolean {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`  ✗ wrangler command failed: ${message}`);
     return false;
+  }
+}
+
+function queryD1Json(sql: string): any[] {
+  try {
+    const raw = execSync(
+      `npx wrangler d1 execute ${D1_DB} --remote --json --command="${sql.replace(/"/g, '\\"')}"`,
+      { cwd: process.cwd(), timeout: 30_000 }
+    ).toString();
+    return JSON.parse(raw)[0]?.results ?? [];
+  } catch {
+    return [];
   }
 }
 
@@ -136,6 +149,7 @@ function printSummary(stats: UploadStats): void {
   console.log("═".repeat(50));
   console.log(`  ✅ Uploaded:          ${stats.uploaded}`);
   console.log(`  ⏭️  Skipped (desktop): ${stats.skippedLandscape}`);
+  console.log(`  ⏭️  Skipped (dupes):   ${stats.skippedDuplicate}`);
   console.log(`  ✗  Skipped (errors):  ${stats.skippedError}`);
   console.log(`  📁 Total scanned:     ${stats.total}`);
   console.log("═".repeat(50) + "\n");
@@ -171,9 +185,15 @@ async function main(): Promise<void> {
 
   console.log(`Found ${imageFiles.length} image files\n`);
 
+  // Fetch existing filenames to skip duplicates (one query, not per-file)
+  const existingRows = queryD1Json("SELECT filename FROM wallpapers");
+  const existingFilenames = new Set(existingRows.map((r: any) => r.filename));
+  console.log(`${existingFilenames.size} wallpapers already in DB\n`);
+
   const stats: UploadStats = {
     uploaded: 0,
     skippedLandscape: 0,
+    skippedDuplicate: 0,
     skippedError: 0,
     total: imageFiles.length,
   };
@@ -184,6 +204,13 @@ async function main(): Promise<void> {
     const ext: string = extname(filename).toLowerCase();
 
     console.log(`[${i + 1}/${imageFiles.length}] ${filename}`);
+
+    // 0. Skip if already uploaded
+    if (existingFilenames.has(filename)) {
+      console.log(`  ⏭️  Skipped — already uploaded`);
+      stats.skippedDuplicate++;
+      continue;
+    }
 
     // 1. Read image dimensions and file size
     const info: ImageInfo | null = await getImageInfo(filePath);
