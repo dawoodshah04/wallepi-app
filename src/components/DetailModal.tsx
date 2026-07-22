@@ -55,7 +55,7 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
     const localUri = await downloadFile();
     if (localUri) {
       try {
-       
+
         await Asset.create(localUri);
         Alert.alert("Success", "Wallpaper saved to gallery!");
       } catch {
@@ -136,12 +136,12 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
 
         {/* Bottom Details panel */}
         <BlurView intensity={40} tint="dark" style={styles.bottomPanel}>
-          <View>
+          {/* <View>
             <Text style={styles.title}>{item.filename.split('.')[0]}</Text>
             <Text style={styles.meta}>
               {item.width} × {item.height}  •  {getMbSize(item.file_size)} MB
             </Text>
-          </View>
+          </View> */}
 
           <View style={styles.btnRow}>
             <Pressable style={[styles.btn, styles.btnSecondary]} onPress={handleDownload} disabled={busy}>

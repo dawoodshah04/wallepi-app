@@ -53,9 +53,8 @@ export default function FavoritesScreen() {
           }
           renderItem={({ item }) => (
             <WallpaperCard
-              id={item.id}
-              url={item.url_thumb}
-              onPress={() => setSelectedItem(item)}
+              item={item}
+              onPress={setSelectedItem}
             />
           )}
         />

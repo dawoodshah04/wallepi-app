@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FlatList, View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FlatList, View, ActivityIndicator, StyleSheet, Text, Dimensions, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 import WallpaperCard from './WallpaperCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,11 @@ interface WallpaperGridProps {
 }
 
 const API_BASE = "https://wallpaper-api.sudo-dawood.workers.dev";
+
+const { width } = Dimensions.get('window');
+const COLUMN_WIDTH = (width - 40 - 12) / 2;
+const CARD_HEIGHT = COLUMN_WIDTH * (16 / 9);
+const ROW_HEIGHT = CARD_HEIGHT + 12;
 
 export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperGridProps) {
   const [data, setData] = useState<WallpaperItem[]>([]);
@@ -44,7 +49,15 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
       const json = await response.json();
 
       if (json.data) {
-        setData(prev => isRefresh ? json.data : [...prev, ...json.data]);
+        setData(prev => {
+          const newData = isRefresh ? json.data : [...prev, ...json.data];
+          const seen = new Set();
+          return newData.filter(item => {
+            if (!item || !item.id || seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          });
+        });
         setHasMore(json.data.length === 20 && pageNum < json.meta.total_pages);
       }
     } catch {
@@ -77,6 +90,16 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
     }
   };
 
+  const handlePress = useCallback((item: WallpaperItem) => {
+    onWallpaperPress(item);
+  }, [onWallpaperPress]);
+
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: ROW_HEIGHT,
+    offset: 12 + ROW_HEIGHT * Math.floor(index / 2),
+    index,
+  }), []);
+
   const renderFooter = () => {
     if (!loading) return null;
     return (
@@ -99,11 +122,15 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
       onRefresh={handleRefresh}
       refreshing={refreshing}
       ListFooterComponent={renderFooter}
+      initialNumToRender={8}
+      maxToRenderPerBatch={10}
+      windowSize={11}
+      removeClippedSubviews={Platform.OS === 'android'}
+      getItemLayout={getItemLayout}
       renderItem={({ item }) => (
         <WallpaperCard
-          id={item.id}
-          url={item.url_thumb}
-          onPress={() => onWallpaperPress(item)}
+          item={item}
+          onPress={handlePress}
         />
       )}
     />

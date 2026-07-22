@@ -2,28 +2,30 @@ import React from 'react';
 import { Pressable, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Colors } from '@/constants/theme';
+import type { WallpaperItem } from './WallpaperGrid';
 
 interface WallpaperCardProps {
-  id: string;
-  url: string;
-  onPress: () => void;
+  item: WallpaperItem;
+  onPress: (item: WallpaperItem) => void;
 }
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 40 - 12) / 2; // screen width - margins (20 * 2) - gap (12)
 
-export default function WallpaperCard({ url, onPress }: WallpaperCardProps) {
+const WallpaperCard = React.memo(function WallpaperCard({ item, onPress }: WallpaperCardProps) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={styles.card} onPress={() => onPress(item)}>
       <Image
-        source={{ uri: url }}
+        source={{ uri: item.url_thumb }}
         style={styles.image}
         contentFit="cover"
         transition={200}
       />
     </Pressable>
   );
-}
+});
+
+export default WallpaperCard;
 
 const styles = StyleSheet.create({
   card: {

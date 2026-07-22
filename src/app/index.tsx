@@ -46,6 +46,10 @@ export default function HomeScreen() {
     await saveFavorites(updated);
   };
 
+  const handleWallpaperPress = useCallback((item: WallpaperItem) => {
+    setSelectedWallpaper(item);
+  }, []);
+
   const insets = useSafeAreaInsets();
 
   return (
@@ -83,7 +87,7 @@ export default function HomeScreen() {
         {/* Paginated Wallpaper Feed Grid */}
         <WallpaperGrid
           category={activeCategory}
-          onWallpaperPress={(item) => setSelectedWallpaper(item)}
+          onWallpaperPress={handleWallpaperPress}
         />
 
         {/* Detail Screen Overlay Modal */}
