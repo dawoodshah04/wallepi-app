@@ -1,13 +1,11 @@
 import { Colors } from '@/constants/theme';
 import { BlurView } from 'expo-blur';
-import { File, Paths, getContentUriAsync } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
-import * as IntentLauncher from 'expo-intent-launcher';
 import { Asset, requestPermissionsAsync } from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, NativeModules, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { WallpaperItem } from './WallpaperGrid';
 
 import { enforceCacheLimit } from '@/lib/cacheManager';
@@ -65,33 +63,38 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
     setBusy(false);
   };
 
-  const handleApply = async () => {
+  const applyWallpaper = async (target: 'home' | 'lock' | 'both') => {
     setBusy(true);
-    const localUri = await downloadFile();
-    if (localUri) {
-      try {
-        if (Platform.OS === 'android') {
-          const contentUri = await getContentUriAsync(localUri);
-          await IntentLauncher.startActivityAsync('android.service.wallpaper.CROP_AND_SET_WALLPAPER', {
-            data: contentUri,
-            type: item.mime_type || 'image/*',
-            flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
-          });
-        } else {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(localUri, {
-              mimeType: item.mime_type,
-              dialogTitle: "Apply Wallpaper",
-            });
-          } else {
-            Alert.alert("Not Supported", "Sharing is not available on this device.");
-          }
-        }
-      } catch {
-        Alert.alert("Error", "Could not set wallpaper.");
-      }
+    try {
+      const localUri = await downloadFile();
+      if (!localUri) return;
+
+      await NativeModules.WallepiWallpaper.setWallpaper(localUri, target);
+      Alert.alert('Wallpaper set', `Applied to ${target === 'both' ? 'home and lock screens' : `${target} screen`}.`);
+    } catch {
+      Alert.alert('Error', 'Could not set wallpaper. Please try another image.');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
+  };
+
+  const handleApply = () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Not Supported', 'Setting wallpaper directly is available on Android only.');
+      return;
+    }
+
+    if (!NativeModules.WallepiWallpaper) {
+      Alert.alert('Update Required', 'Rebuild the Android app to enable setting wallpapers.');
+      return;
+    }
+
+    Alert.alert('Set wallpaper', 'Choose where to apply this wallpaper.', [
+      { text: 'Home screen', onPress: () => applyWallpaper('home') },
+      { text: 'Lock screen', onPress: () => applyWallpaper('lock') },
+      { text: 'Both', onPress: () => applyWallpaper('both') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const getMbSize = (bytes: number) => {
