@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FlatList, View, ActivityIndicator, StyleSheet, Text, Dimensions, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 import WallpaperCard from './WallpaperCard';
@@ -13,11 +13,13 @@ export interface WallpaperItem {
   height: number;
   file_size: number;
   mime_type: string;
+  blurhash: string | null;
 }
 
 interface WallpaperGridProps {
   category?: string;
   onWallpaperPress: (item: WallpaperItem) => void;
+  onInitialLoadComplete?: () => void;
 }
 
 const API_BASE = "https://wallpaper-api.sudo-dawood.workers.dev";
@@ -27,7 +29,7 @@ const COLUMN_WIDTH = (width - 40 - 12) / 2;
 const CARD_HEIGHT = COLUMN_WIDTH * (16 / 9);
 const ROW_HEIGHT = CARD_HEIGHT + 12;
 
-export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperGridProps) {
+export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoadComplete }: WallpaperGridProps) {
   const [data, setData] = useState<WallpaperItem[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -35,8 +37,13 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
   const [hasMore, setHasMore] = useState(true);
   const insets = useSafeAreaInsets();
 
+  // Guard ref to prevent duplicate onEndReached pagination calls
+  const loadingRef = useRef(false);
+  const initialLoadFiredRef = useRef(false);
+
   const fetchWallpapers = async (pageNum: number, isRefresh = false) => {
-    if (loading || (!hasMore && !isRefresh)) return;
+    if (loadingRef.current || (!hasMore && !isRefresh)) return;
+    loadingRef.current = true;
     setLoading(true);
 
     try {
@@ -50,19 +57,26 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
 
       if (json.data) {
         setData(prev => {
-          const newData = isRefresh ? json.data : [...prev, ...json.data];
-          const seen = new Set();
-          return newData.filter(item => {
+          const newData: WallpaperItem[] = isRefresh ? json.data : [...prev, ...json.data];
+          const seen = new Set<string>();
+          return newData.filter((item: WallpaperItem) => {
             if (!item || !item.id || seen.has(item.id)) return false;
             seen.add(item.id);
             return true;
           });
         });
-        setHasMore(json.data.length === 20 && pageNum < json.meta.total_pages);
+        setHasMore(json.meta?.has_more ?? json.data.length === 20);
+
+        // Signal initial load complete for splash screen coordination
+        if (pageNum === 1 && !initialLoadFiredRef.current) {
+          initialLoadFiredRef.current = true;
+          onInitialLoadComplete?.();
+        }
       }
     } catch {
-      // Sloped error handling - no UI noise
+      // Silent error handling - no UI noise
     } finally {
+      loadingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -72,6 +86,7 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
     setData([]);
     setPage(1);
     setHasMore(true);
+    initialLoadFiredRef.current = false;
     fetchWallpapers(1, true);
   }, [category]);
 
@@ -83,7 +98,7 @@ export default function WallpaperGrid({ category, onWallpaperPress }: WallpaperG
   };
 
   const handleLoadMore = () => {
-    if (hasMore && !loading) {
+    if (hasMore && !loadingRef.current) {
       const nextPage = page + 1;
       setPage(nextPage);
       fetchWallpapers(nextPage);

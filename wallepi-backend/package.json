@@ -8,7 +8,9 @@
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute wallpaper-manifest --remote --file=./schema.sql",
     "upload": "npx tsx scripts/upload.ts",
-    "tag": "npx tsx scripts/image-tagging.ts"
+    "tag": "npx tsx scripts/image-tagging.ts",
+    "import-tags": "npx tsx scripts/import-tags.ts",
+    "backfill-blurhash": "npx tsx scripts/backfill_blurhash.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +19,7 @@
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1092.0",
     "@aws-sdk/client-s3": "^3.1092.0",
+    "blurhash": "^2.0.5",
     "canvas": "^3.2.3",
     "dotenv": "^17.4.2",
     "hono": "^4.12.29"

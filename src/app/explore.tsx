@@ -47,7 +47,7 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <Pressable style={styles.card} onPress={() => handleCategoryPress(item.countKey)}>
-              <Image source={{ uri: item.image }} style={styles.image} contentFit="cover" />
+              <Image source={{ uri: item.image }} style={styles.image} contentFit="cover" transition={300} cachePolicy="memory-disk" />
               <View style={styles.overlay}>
                 <ThemedText type="subtitle" style={styles.titleText}>{item.name}</ThemedText>
                 <ThemedText style={styles.countText}>View Wallpapers</ThemedText>

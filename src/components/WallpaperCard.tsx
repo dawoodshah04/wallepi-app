@@ -17,9 +17,12 @@ const WallpaperCard = React.memo(function WallpaperCard({ item, onPress }: Wallp
     <Pressable style={styles.card} onPress={() => onPress(item)}>
       <Image
         source={{ uri: item.url_thumb }}
+        placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
         style={styles.image}
         contentFit="cover"
-        transition={200}
+        transition={300}
+        cachePolicy="memory-disk"
+        recyclingKey={item.id}
       />
     </Pressable>
   );

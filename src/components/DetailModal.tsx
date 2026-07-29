@@ -111,8 +111,12 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
       <View style={styles.container}>
         <Image
           source={{ uri: item.url_full }}
+          placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
           style={styles.image}
           contentFit="cover"
+          transition={400}
+          cachePolicy="memory-disk"
+          priority="high"
         />
 
         {/* Top Controls Overlay */}
