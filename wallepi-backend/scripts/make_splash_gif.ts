@@ -153,7 +153,7 @@ async function main() {
   await sharp(strip, {
     animated: true,
     pageHeight: height,
-  })
+  } as any)
     .gif({
       delay: frameCompositeInputs.map(() => 40), // 40ms per frame = 25 FPS smooth animation
       loop: 0,

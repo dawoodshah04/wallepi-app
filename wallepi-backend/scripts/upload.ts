@@ -8,15 +8,17 @@
  *   1. Scans the folder for image files (jpg, jpeg, png, webp)
  *   2. Reads dimensions with sharp — SKIPS landscape/desktop images (width >= height)
  *   3. Generates a 400px-wide webp thumbnail
- *   4. Uploads full image + thumbnail to R2 via `npx wrangler r2 object put`
- *   5. Inserts metadata row into D1 via `npx wrangler d1 execute`
- *   6. Prints a summary at the end
+ *   4. Generates a BlurHash string from the thumbnail for instant placeholders
+ *   5. Uploads full image + thumbnail to R2 via `npx wrangler r2 object put`
+ *   6. Inserts metadata row (including blurhash) into D1 via `npx wrangler d1 execute`
+ *   7. Prints a summary at the end
  *
  * Requirements:
  *   - wrangler must be authenticated (`npx wrangler login`)
  *   - R2 bucket "wallpapers" must exist
  *   - D1 database "wallpaper-manifest" must exist with schema.sql applied
  *   - sharp must be installed
+ *   - blurhash must be installed
  */
 
 import { readdir, stat, mkdir, rm } from "node:fs/promises";
@@ -24,6 +26,7 @@ import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import sharp from "sharp";
+import { encode } from "blurhash";
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -122,6 +125,30 @@ async function generateThumbnail(
     .toFile(outputPath);
 }
 
+/**
+ * Generate a BlurHash string from an image file.
+ * Resizes to a small 32px-wide image for fast encoding.
+ */
+async function generateBlurhash(filePath: string): Promise<string | null> {
+  try {
+    const { data, info } = await sharp(filePath)
+      .resize(32)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    return encode(
+      new Uint8ClampedArray(data),
+      info.width,
+      info.height,
+      4, // x components
+      3  // y components
+    );
+  } catch {
+    return null;
+  }
+}
+
 function uploadToR2(key: string, filePath: string, contentType: string): boolean {
   return runWrangler(
     `r2 object put "${R2_BUCKET}/${key}" --file="${filePath}" --content-type="${contentType}" --remote`
@@ -134,9 +161,11 @@ function insertIntoD1(
   r2KeyFull: string,
   r2KeyThumb: string,
   info: ImageInfo,
-  mimeType: string
+  mimeType: string,
+  blurhash: string | null
 ): boolean {
-  const sql = `INSERT INTO wallpapers (id, filename, r2_key_full, r2_key_thumb, width, height, file_size, mime_type) VALUES ('${escapeSQL(id)}', '${escapeSQL(filename)}', '${escapeSQL(r2KeyFull)}', '${escapeSQL(r2KeyThumb)}', ${info.width}, ${info.height}, ${info.fileSize}, '${escapeSQL(mimeType)}');`;
+  const blurhashValue = blurhash ? `'${escapeSQL(blurhash)}'` : "NULL";
+  const sql = `INSERT INTO wallpapers (id, filename, r2_key_full, r2_key_thumb, width, height, file_size, mime_type, blurhash) VALUES ('${escapeSQL(id)}', '${escapeSQL(filename)}', '${escapeSQL(r2KeyFull)}', '${escapeSQL(r2KeyThumb)}', ${info.width}, ${info.height}, ${info.fileSize}, '${escapeSQL(mimeType)}', ${blurhashValue});`;
 
   return runWrangler(
     `d1 execute ${D1_DB} --remote --command="${sql.replace(/"/g, '\\"')}"`
@@ -251,23 +280,32 @@ async function main(): Promise<void> {
       continue;
     }
 
-    // 5. Upload full image to R2
+    // 5. Generate BlurHash from the thumbnail
+    console.log(`  🎨 Generating BlurHash...`);
+    const blurhash = await generateBlurhash(thumbPath);
+    if (blurhash) {
+      console.log(`  🎨 BlurHash: ${blurhash}`);
+    } else {
+      console.log(`  ⚠️  BlurHash generation failed (will use null)`);
+    }
+
+    // 6. Upload full image to R2
     console.log(`  ☁️  Uploading full image...`);
     if (!uploadToR2(r2KeyFull, filePath, mimeType)) {
       stats.skippedError++;
       continue;
     }
 
-    // 6. Upload thumbnail to R2
+    // 7. Upload thumbnail to R2
     console.log(`  ☁️  Uploading thumbnail...`);
     if (!uploadToR2(r2KeyThumb, thumbPath, "image/webp")) {
       stats.skippedError++;
       continue;
     }
 
-    // 7. Insert metadata into D1
+    // 8. Insert metadata into D1 (with blurhash)
     console.log(`  🗄️  Inserting into D1...`);
-    if (!insertIntoD1(id, filename, r2KeyFull, r2KeyThumb, info, mimeType)) {
+    if (!insertIntoD1(id, filename, r2KeyFull, r2KeyThumb, info, mimeType, blurhash)) {
       stats.skippedError++;
       continue;
     }

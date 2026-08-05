@@ -20,8 +20,10 @@ export interface WallpaperRow {
   height: number;
   file_size: number;
   mime_type: string;
+  category: string;
   is_active: number;
   created_at: string;
+  blurhash: string | null;
 }
 
 // ── API Response Types ──────────────────────────────────────────────
@@ -36,6 +38,10 @@ export interface WallpaperResponse {
   file_size: number;
   mime_type: string;
   created_at: string;
+  blurhash: string | null;
+  categories: string[];
+  primary_category: string | null;
+  tags: Array<{ name: string; confidence: number }>;
 }
 
 export interface PaginatedResponse<T> {
@@ -43,8 +49,7 @@ export interface PaginatedResponse<T> {
   meta: {
     page: number;
     limit: number;
-    total: number;
-    total_pages: number;
+    has_more: boolean;
   };
 }
 

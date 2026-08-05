@@ -31,7 +31,7 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
 
       const downloadedFile = await File.downloadFileAsync(item.url_full, destinationFile);
 
-      // Enforce the 200MB cache limit asynchronously
+      // Enforce the 50MB download cache limit asynchronously
       enforceCacheLimit();
 
       return downloadedFile.uri;

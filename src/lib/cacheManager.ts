@@ -1,6 +1,6 @@
 import { Paths, File, Directory } from "expo-file-system";
 
-const CACHE_LIMIT_BYTES = 200 * 1024 * 1024; // 200MB
+const CACHE_LIMIT_BYTES = 50 * 1024 * 1024; // 50MB
 
 export async function enforceCacheLimit(): Promise<void> {
   try {
@@ -18,7 +18,7 @@ export async function enforceCacheLimit(): Promise<void> {
       }
     }
 
-    // If cache size is under the 200MB limit, do nothing
+    // Enforce the 50MB download cache limit asynchronously
     if (totalSize <= CACHE_LIMIT_BYTES) {
       return;
     }

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Platform } from 'react-native';
 import { Tabs, router } from 'expo-router';
+import { Image } from 'expo-image';
 import FloatingNavBar from '@/components/FloatingNavBar';
 import AnimatedSplashOverlay from '@/components/AnimatedSplashOverlay';
 import { AppReadyContext } from '@/lib/appReadyContext';
@@ -11,6 +12,14 @@ import * as SplashScreen from 'expo-splash-screen';
 
 // Prevent the native splash from auto-hiding so we can hand off to AnimatedSplashOverlay
 SplashScreen.preventAutoHideAsync();
+
+// Configure expo-image's native cache limits (iOS only — uses SDWebImage under the hood).
+// On Android, Glide manages its own cache; we handle it via clearDiskCache() below.
+Image.configureCache({
+  maxDiskSize: 50 * 1024 * 1024,     // 50 MB disk cache
+  maxMemoryCost: 100 * 1024 * 1024,  // 100 MB total memory cost (bytes in RAM)
+  maxMemoryCount: 50,                // Max 50 images held in memory
+});
 
 export default function AppLayout() {
   const targetRef = useRef<View | null>(null);

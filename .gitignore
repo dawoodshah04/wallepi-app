@@ -50,3 +50,5 @@ wallpaper_app_two_person_plan.md
 
 *.md
 *.toml
+
+/wallepie-backend/wrangler.toml
