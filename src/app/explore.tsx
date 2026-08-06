@@ -14,10 +14,15 @@ interface CategoryItem {
 }
 
 const CATEGORIES: CategoryItem[] = [
-  { name: 'Minimal', countKey: 'minimal', image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80' },
   { name: 'Nature', countKey: 'nature', image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Space', countKey: 'space', image: 'https://images.unsplash.com/photo-1451186859696-371d9477be93?w=400&auto=format&fit=crop&q=80' },
   { name: 'Dark', countKey: 'dark', image: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=400&auto=format&fit=crop&q=80' },
-  { name: 'Anime', countKey: 'anime', image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Art', countKey: 'art', image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400&auto=format&fit=crop&q=80' },
+  { name: 'City', countKey: 'city', image: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Water', countKey: 'water', image: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Mountain', countKey: 'mountain', image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Architecture', countKey: 'architecture', image: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Minimal', countKey: 'minimal', image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80' },
 ];
 
 const { width } = Dimensions.get('window');

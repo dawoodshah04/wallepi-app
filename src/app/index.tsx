@@ -4,23 +4,18 @@ import { ThemedView } from '@/components/themed-view';
 import WallpaperGrid, { WallpaperItem } from '@/components/WallpaperGrid';
 import { Colors } from '@/constants/theme';
 import { getFavorites, saveFavorites } from '@/lib/favoritesStore';
-import { useAppReady } from '@/lib/appReadyContext';
-import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CATEGORIES = ['All', 'Minimal', 'Nature', 'Dark', 'Abstract'];
-
-const API_BASE = "https://wallpaper-api.sudo-dawood.workers.dev";
+const CATEGORIES = ['All', 'Nature', 'Space', 'Dark', 'Art', 'City', 'Water', 'Mountain', 'Architecture', 'Minimal'];
 
 export default function HomeScreen() {
   const searchParams = useLocalSearchParams<{ category?: string }>();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedWallpaper, setSelectedWallpaper] = useState<WallpaperItem | null>(null);
   const [favoritesList, setFavoritesList] = useState<WallpaperItem[]>([]);
-  const { signalReady } = useAppReady();
 
   // Sync route param category selection from ExploreScreen
   useEffect(() => {
@@ -55,29 +50,6 @@ export default function HomeScreen() {
     setSelectedWallpaper(item);
   }, []);
 
-  /**
-   * Called when WallpaperGrid finishes loading page 1.
-   * Prefetch the first batch of thumbnail URLs into expo-image's native cache,
-   * then signal the splash overlay to fade out.
-   */
-  const handleInitialLoadComplete = useCallback(async () => {
-    try {
-      // Fetch first page data to get thumbnail URLs for prefetching
-      const response = await fetch(`${API_BASE}/api/wallpapers?page=1&limit=20`);
-      const json = await response.json();
-      const thumbUrls: string[] = (json.data ?? [])
-        .slice(0, 8) // Prefetch first 8 thumbnails (visible in initial viewport)
-        .map((item: WallpaperItem) => item.url_thumb);
-
-      if (thumbUrls.length > 0) {
-        await Image.prefetch(thumbUrls);
-      }
-    } catch {
-      // Prefetch failure is non-critical — splash will still dismiss
-    }
-
-    signalReady();
-  }, [signalReady]);
 
   const insets = useSafeAreaInsets();
 
@@ -117,7 +89,6 @@ export default function HomeScreen() {
         <WallpaperGrid
           category={activeCategory}
           onWallpaperPress={handleWallpaperPress}
-          onInitialLoadComplete={handleInitialLoadComplete}
         />
 
         {/* Detail Screen Overlay Modal */}
