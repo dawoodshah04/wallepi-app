@@ -1,9 +1,28 @@
-import React from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Pressable, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { BlurView, BlurMethod } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+const TABS = [
+  {
+    tab: 'index',
+    iconActive:   { ios: 'house.fill',          android: 'home',           web: 'home' },
+    iconInactive: { ios: 'house',               android: 'home',           web: 'home' },
+  },
+  {
+    tab: 'explore',
+    iconActive:   { ios: 'square.grid.2x2.fill', android: 'explore',       web: 'explore' },
+    iconInactive: { ios: 'square.grid.2x2',      android: 'explore',       web: 'explore' },
+  },
+  {
+    tab: 'favorites',
+    iconActive:   { ios: 'heart.fill',          android: 'favorite',       web: 'favorite' },
+    iconInactive: { ios: 'heart',               android: 'favorite_border', web: 'favorite_border' },
+  },
+] as const;
 
 interface FloatingNavBarProps {
   currentTab: 'index' | 'explore' | 'favorites';
@@ -16,36 +35,53 @@ export default function FloatingNavBar({ currentTab, onTabSelect, blurTarget }: 
   const blurMethod: BlurMethod = 'dimezisBlurViewSdk31Plus';
   const insets = useSafeAreaInsets();
 
+  const tabIndex = TABS.findIndex(t => t.tab === currentTab);
+  const itemWidth = useSharedValue(0);
+  const translateX = useSharedValue(0);
+
+  // Measure each item width from container layout
+  const onCapsuleLayout = (e: LayoutChangeEvent) => {
+    const capsuleWidth = e.nativeEvent.layout.width;
+    // Account for paddingHorizontal (8 each side)
+    const innerWidth = capsuleWidth - 16;
+    const w = innerWidth / TABS.length;
+    itemWidth.value = w;
+    translateX.value = tabIndex * w;
+  };
+
+  useEffect(() => {
+    if (itemWidth.value > 0) {
+      translateX.value = withSpring(tabIndex * itemWidth.value, {
+        damping: 20,
+        stiffness: 200,
+        mass: 0.8,
+      });
+    }
+  }, [tabIndex]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    width: itemWidth.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
   return (
     <View style={[styles.container, { bottom: Math.max(insets.bottom, 12) + 12 }]}>
-      {/* Primary Capsule Menu */}
       <BlurView
         intensity={60}
         tint="dark"
         style={styles.capsule}
         blurMethod={blurMethod}
         blurTarget={blurTarget}
+        onLayout={onCapsuleLayout}
       >
-        {([
-          {
-            tab: 'index',
-            iconActive:   { ios: 'house.fill',          android: 'home',           web: 'home' },
-            iconInactive: { ios: 'house',               android: 'home',           web: 'home' },
-          },
-          {
-            tab: 'explore',
-            iconActive:   { ios: 'square.grid.2x2.fill', android: 'explore',       web: 'explore' },
-            iconInactive: { ios: 'square.grid.2x2',      android: 'explore',       web: 'explore' },
-          },
-          {
-            tab: 'favorites',
-            iconActive:   { ios: 'heart.fill',          android: 'favorite',       web: 'favorite' },
-            iconInactive: { ios: 'heart',               android: 'favorite_border', web: 'favorite_border' },
-          },
-        ] as const).map(({ tab, iconActive, iconInactive }) => (
+        {/* Animated pill indicator */}
+        <Animated.View style={[styles.pill, pillStyle]} />
+
+        {/* Tab items */}
+        {TABS.map(({ tab, iconActive, iconInactive }) => (
           <Pressable
             key={tab}
-            style={[styles.item, currentTab === tab && styles.activeItem]}
+            style={styles.item}
             onPress={() => onTabSelect(tab)}
           >
             <SymbolView
@@ -86,14 +122,18 @@ const styles = StyleSheet.create({
     elevation: 8,
     overflow: 'hidden',
   },
+  pill: {
+    position: 'absolute',
+    left: 8,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.dark.accent,
+  },
   item: {
     flex: 1,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  activeItem: {
-    backgroundColor: Colors.dark.accent,
   },
 });

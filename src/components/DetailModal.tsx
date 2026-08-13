@@ -29,7 +29,7 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
       const filename = `${item.id}.${item.mime_type.split('/')[1] || 'jpg'}`;
       const destinationFile = new File(Paths.document, filename);
 
-      const downloadedFile = await File.downloadFileAsync(item.url_full, destinationFile);
+      const downloadedFile = await File.downloadFileAsync(item.url_full, destinationFile, { idempotent: true });
 
       // Enforce the 50MB download cache limit asynchronously
       enforceCacheLimit();
@@ -43,7 +43,7 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
 
   const handleDownload = async () => {
     setBusy(true);
-    const { status } = await requestPermissionsAsync();
+    const { status } = await requestPermissionsAsync(true, ['photo']);
     if (status !== 'granted') {
       Alert.alert("Permission Required", "Please allow gallery access to save wallpapers.");
       setBusy(false);
