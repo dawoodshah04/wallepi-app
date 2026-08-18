@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +13,8 @@ import DetailModal from '@/components/DetailModal';
 export default function FavoritesScreen() {
   const [favoritesList, setFavoritesList] = useState<WallpaperItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<WallpaperItem | null>(null);
+  const { width } = useWindowDimensions();
+  const columnWidth = Math.floor((width - 40 - 12) / 2);
 
   // Reload favorites list whenever screen gains active navigation focus
   useFocusEffect(
@@ -55,6 +57,7 @@ export default function FavoritesScreen() {
             <WallpaperCard
               item={item}
               onPress={setSelectedItem}
+              cardWidth={columnWidth}
             />
           )}
         />
@@ -88,7 +91,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   row: {
-    justifyContent: 'space-between',
+    gap: 12,
     marginBottom: 12,
   },
   emptyContainer: {

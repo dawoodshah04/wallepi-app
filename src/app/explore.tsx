@@ -25,9 +25,6 @@ const CATEGORIES: CategoryItem[] = [
   { name: 'Minimal', countKey: 'minimal', image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80' },
 ];
 
-const { width } = Dimensions.get('window');
-const ROW_WIDTH = width - 40;
-
 export default function ExploreScreen() {
   const handleCategoryPress = (category: string) => {
     router.navigate({
@@ -52,7 +49,7 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <Pressable style={styles.card} onPress={() => handleCategoryPress(item.countKey)}>
-              <Image source={{ uri: item.image }} style={styles.image} contentFit="cover" transition={300} cachePolicy="memory-disk" />
+              <Image source={{ uri: item.image }} style={styles.image} contentFit="cover" transition={0} cachePolicy="memory-disk" />
               <View style={styles.overlay}>
                 <ThemedText type="subtitle" style={styles.titleText}>{item.name}</ThemedText>
                 <ThemedText style={styles.countText}>View Wallpapers</ThemedText>
@@ -82,7 +79,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   card: {
-    width: ROW_WIDTH,
+    width: '100%',
     height: 120,
     borderRadius: 24,
     backgroundColor: Colors.dark.backgroundElement,

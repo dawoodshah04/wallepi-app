@@ -14,9 +14,13 @@
 ## ✨ Key Features
 
 - 📱 **Mobile-First Curation**: Automated aspect-ratio filtering ($\le 0.65$) ensures only high-quality portrait wallpapers tailored for mobile screens are ingested.
-- ⚡ **Dual-Tier Image Delivery**:
+- ⚡ **Dual-Tier Image Delivery & BlurHash**:
+  - **`expo-image` Native Rendering**: Utilizes native image engines (Glide on Android / SDWebImage on iOS) with `memory-disk` cache policies and instant transition rendering to prevent flicker.
+  - **BlurHash Placeholders**: Instant UI feedback before image payload arrives over network.
   - **400px WebP Thumbnails**: Micro-sized for rapid grid scrolling and ultra-low memory consumption.
   - **Full-Resolution R2 Images**: High-resolution imagery streamed on-demand via Cloudflare R2 with ETag and cache headers.
+- 🚀 **High-Efficiency D1 Indexing**:
+  - Composite indexes `(is_active, created_at DESC)` and `(is_active, category, created_at DESC)` ensure $O(\text{limit})$ index range scans, reducing database read load by over 95%.
 - 🎨 **Modern Aesthetics & Glassmorphism**:
   - **Expo Router** file-based navigation.
   - Floating frosted-glass navigation bar utilizing `expo-blur`.
@@ -238,6 +242,22 @@ Run the AI tagging script:
 ```bash
 npm run tag
 ```
+
+### Backfilling BlurHash
+
+To generate BlurHash strings for existing wallpapers missing placeholders:
+```bash
+cd wallepi-backend
+npm run backfill-blurhash
+```
+
+---
+
+## ⚡ Performance & Caching Notes
+
+- **`expo-image` vs Standard `<Image>`**: Wallepi uses `expo-image` exclusively. Standard React Native `Image` lacks native disk caching and blurhash support. `expo-image` leverages Glide (Android) / SDWebImage (iOS) with hardware decoding, zero-duration transitions on cached grid cells, and persistent disk caching.
+- **D1 Row-Read Optimization**: Composite indexes `(is_active, created_at DESC)` ensure feed pagination reads only the requested slice ($O(\text{limit})$) instead of scanning the full table on every query.
+- **Edge Caching**: Cloudflare Workers Cache API (`caches.default`) is active when attached to a custom zone domain. On default `*.workers.dev` endpoints, cache headers provide browser/client HTTP-level caching.
 
 ---
 

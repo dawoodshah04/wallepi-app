@@ -1,26 +1,25 @@
 /**
- * backfill_blurhash.ts — Generate BlurHash for existing wallpapers that have blurhash IS NULL
+ * backfill_blurhash.ts — Fast, batched BlurHash generation for wallpapers
  *
  * Usage:
  *   npx tsx scripts/backfill_blurhash.ts
- *
- * What it does:
- *   1. Queries D1 for all wallpapers with blurhash IS NULL
- *   2. Downloads each thumbnail from R2 via the API
- *   3. Generates a BlurHash string from the thumbnail
- *   4. Updates the row in D1 with the blurhash value
  */
 
 import { execSync } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import sharp from "sharp";
 import { encode } from "blurhash";
 
 const D1_DB = "wallpaper-manifest" as const;
 const API_BASE = "https://wallpaper-api.sudo-dawood.workers.dev";
+const BATCH_SIZE = 50;
+const CONCURRENCY = 5;
 
 interface WallpaperRow {
   id: string;
   filename: string;
+  r2_key_full: string;
   r2_key_thumb: string;
 }
 
@@ -40,9 +39,12 @@ function escapeSQL(str: string): string {
   return str.replace(/'/g, "''");
 }
 
-function runWrangler(args: string): boolean {
+function executeSqlBatch(statements: string[]): boolean {
+  if (statements.length === 0) return true;
+  const tempFile = join(process.cwd(), `.batch-${Date.now()}.sql`);
   try {
-    execSync(`npx wrangler ${args}`, {
+    writeFileSync(tempFile, statements.join("\n"), "utf-8");
+    execSync(`npx wrangler d1 execute ${D1_DB} --remote --file="${tempFile}"`, {
       cwd: process.cwd(),
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 60_000,
@@ -50,8 +52,12 @@ function runWrangler(args: string): boolean {
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`  ✗ wrangler command failed: ${message}`);
+    console.error(`  ✗ Batch update failed: ${message}`);
     return false;
+  } finally {
+    try {
+      unlinkSync(tempFile);
+    } catch {}
   }
 }
 
@@ -79,60 +85,72 @@ async function generateBlurhashFromUrl(imageUrl: string): Promise<string | null>
   }
 }
 
+async function processRow(row: WallpaperRow): Promise<{ id: string; blurhash: string | null; filename: string }> {
+  // Try thumbnail first, fallback to full image if thumbnail is 404/missing
+  let blurhash = await generateBlurhashFromUrl(`${API_BASE}/api/images/${row.r2_key_thumb}`);
+  if (!blurhash && row.r2_key_full) {
+    blurhash = await generateBlurhashFromUrl(`${API_BASE}/api/images/${row.r2_key_full}`);
+  }
+  return { id: row.id, blurhash, filename: row.filename };
+}
+
 async function main(): Promise<void> {
-  console.log("\n🎨 Wallepi — BlurHash Backfill");
+  console.log("\n🎨 Wallepi — BlurHash Backfill (Fast Batched)");
   console.log("─".repeat(50));
 
-  // Fetch all wallpapers that don't have a blurhash yet
-  const rows = queryD1Json("SELECT id, filename, r2_key_thumb FROM wallpapers WHERE blurhash IS NULL") as WallpaperRow[];
+  const rows = queryD1Json(
+    "SELECT id, filename, r2_key_full, r2_key_thumb FROM wallpapers WHERE blurhash IS NULL"
+  ) as WallpaperRow[];
 
   if (rows.length === 0) {
-    console.log("✅ All wallpapers already have BlurHash values. Nothing to do.\n");
+    console.log("✅ All wallpapers already have BlurHash values.\n");
     return;
   }
 
   console.log(`Found ${rows.length} wallpapers without BlurHash\n`);
 
   let updated = 0;
-  let failed = 0;
+  let missing = 0;
+  const pendingUpdates: string[] = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!;
-    console.log(`[${i + 1}/${rows.length}] ${row.filename}`);
+  // Process in chunks with concurrency
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    const chunk = rows.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(chunk.map(processRow));
 
-    // Download thumbnail via the API proxy
-    const thumbUrl = `${API_BASE}/api/images/${row.r2_key_thumb}`;
-    const blurhash = await generateBlurhashFromUrl(thumbUrl);
-
-    if (!blurhash) {
-      console.log(`  ⚠️  Failed to generate BlurHash`);
-      failed++;
-      continue;
+    for (const res of results) {
+      if (res.blurhash) {
+        console.log(`  ✅ [${res.id.slice(0, 8)}] ${res.filename} -> ${res.blurhash}`);
+        pendingUpdates.push(
+          `UPDATE wallpapers SET blurhash = '${escapeSQL(res.blurhash)}' WHERE id = '${escapeSQL(res.id)}';`
+        );
+        updated++;
+      } else {
+        console.log(`  ⚠️  [${res.id.slice(0, 8)}] ${res.filename} (missing in R2 / 404)`);
+        missing++;
+      }
     }
 
-    console.log(`  🎨 BlurHash: ${blurhash}`);
-
-    // Update the row in D1
-    const sql = `UPDATE wallpapers SET blurhash = '${escapeSQL(blurhash)}' WHERE id = '${escapeSQL(row.id)}';`;
-    const success = runWrangler(
-      `d1 execute ${D1_DB} --remote --command="${sql.replace(/"/g, '\\"')}"`
-    );
-
-    if (success) {
-      console.log(`  ✅ Updated`);
-      updated++;
-    } else {
-      console.log(`  ✗ D1 update failed`);
-      failed++;
+    // Flush batch to D1 if size threshold reached
+    if (pendingUpdates.length >= BATCH_SIZE) {
+      console.log(`\n💾 Flushing batch of ${pendingUpdates.length} updates to D1...`);
+      executeSqlBatch(pendingUpdates);
+      pendingUpdates.length = 0;
     }
+  }
+
+  // Flush remaining updates
+  if (pendingUpdates.length > 0) {
+    console.log(`\n💾 Flushing final batch of ${pendingUpdates.length} updates to D1...`);
+    executeSqlBatch(pendingUpdates);
   }
 
   console.log("\n" + "═".repeat(50));
   console.log("📊 Backfill Summary");
   console.log("═".repeat(50));
-  console.log(`  ✅ Updated:  ${updated}`);
-  console.log(`  ✗  Failed:   ${failed}`);
-  console.log(`  📁 Total:    ${rows.length}`);
+  console.log(`  ✅ Updated:      ${updated}`);
+  console.log(`  ⚠️  Missing in R2: ${missing}`);
+  console.log(`  📁 Total:        ${rows.length}`);
   console.log("═".repeat(50) + "\n");
 }
 

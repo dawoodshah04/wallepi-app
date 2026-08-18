@@ -52,9 +52,9 @@ export default function FloatingNavBar({ currentTab, onTabSelect, blurTarget }: 
   useEffect(() => {
     if (itemWidth.value > 0) {
       translateX.value = withSpring(tabIndex * itemWidth.value, {
-        damping: 20,
-        stiffness: 200,
-        mass: 0.8,
+        damping: 24,
+        stiffness: 280,
+        mass: 0.6,
       });
     }
   }, [tabIndex]);
@@ -81,7 +81,7 @@ export default function FloatingNavBar({ currentTab, onTabSelect, blurTarget }: 
         {TABS.map(({ tab, iconActive, iconInactive }) => (
           <Pressable
             key={tab}
-            style={styles.item}
+            style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
             onPress={() => onTabSelect(tab)}
           >
             <SymbolView
@@ -135,5 +135,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  itemPressed: {
+    transform: [{ scale: 0.90 }],
+    opacity: 0.8,
   },
 });

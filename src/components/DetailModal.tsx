@@ -121,13 +121,27 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
 
         {/* Top Controls Overlay */}
         <View style={styles.topBar}>
-          <Pressable style={styles.circleBtn} onPress={onClose}>
-            <SymbolView name="chevron.left" tintColor="#fff" size={20} />
+          <Pressable
+            style={({ pressed }) => [styles.circleBtn, pressed && styles.circleBtnPressed]}
+            onPress={onClose}
+          >
+            <SymbolView
+              name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}
+              tintColor="#fff"
+              size={20}
+            />
           </Pressable>
 
-          <Pressable style={styles.circleBtn} onPress={onToggleFavorite}>
+          <Pressable
+            style={({ pressed }) => [styles.circleBtn, pressed && styles.circleBtnPressed]}
+            onPress={onToggleFavorite}
+          >
             <SymbolView
-              name={isFavorite ? "heart.fill" : "heart"}
+              name={
+                isFavorite
+                  ? { ios: 'heart.fill', android: 'favorite', web: 'favorite' }
+                  : { ios: 'heart', android: 'favorite_border', web: 'favorite_border' }
+              }
               tintColor={isFavorite ? c.accent : "#fff"}
               size={20}
             />
@@ -143,19 +157,20 @@ export default function DetailModal({ item, visible, onClose, isFavorite, onTogg
 
         {/* Bottom Details panel */}
         <BlurView intensity={40} tint="dark" style={styles.bottomPanel}>
-          {/* <View>
-            <Text style={styles.title}>{item.filename.split('.')[0]}</Text>
-            <Text style={styles.meta}>
-              {item.width} × {item.height}  •  {getMbSize(item.file_size)} MB
-            </Text>
-          </View> */}
-
           <View style={styles.btnRow}>
-            <Pressable style={[styles.btn, styles.btnSecondary]} onPress={handleDownload} disabled={busy}>
+            <Pressable
+              style={({ pressed }) => [styles.btn, styles.btnSecondary, pressed && styles.btnPressed]}
+              onPress={handleDownload}
+              disabled={busy}
+            >
               <Text style={styles.btnTextSecondary}>Download</Text>
             </Pressable>
 
-            <Pressable style={[styles.btn, styles.btnPrimary]} onPress={handleApply} disabled={busy}>
+            <Pressable
+              style={({ pressed }) => [styles.btn, styles.btnPrimary, pressed && styles.btnPressed]}
+              onPress={handleApply}
+              disabled={busy}
+            >
               <Text style={styles.btnTextPrimary}>Apply</Text>
             </Pressable>
           </View>
@@ -183,33 +198,35 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   circleBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingContainer: {
-    ...StyleSheet.absoluteFill,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  circleBtnPressed: {
+    transform: [{ scale: 0.90 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  loadingContainer: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   bottomPanel: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingTop: 30,
-    paddingBottom: 44,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
-    gap: 20,
+    bottom: 24,
+    left: 20,
+    right: 20,
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     overflow: 'hidden',
   },
   title: {
@@ -232,6 +249,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  btnPressed: {
+    transform: [{ scale: 0.96 }],
+    opacity: 0.85,
   },
   btnPrimary: {
     backgroundColor: Colors.dark.accent,

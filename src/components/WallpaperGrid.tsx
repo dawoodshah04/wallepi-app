@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FlatList, View, ActivityIndicator, StyleSheet, Text, Dimensions, Platform } from 'react-native';
+import { FlatList, View, ActivityIndicator, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { Colors } from '@/constants/theme';
 import WallpaperCard from './WallpaperCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,11 +24,6 @@ interface WallpaperGridProps {
 
 const API_BASE = "https://wallpaper-api.sudo-dawood.workers.dev";
 
-const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = (width - 40 - 12) / 2;
-const CARD_HEIGHT = COLUMN_WIDTH * (16 / 9);
-const ROW_HEIGHT = CARD_HEIGHT + 12;
-
 export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoadComplete }: WallpaperGridProps) {
   const [data, setData] = useState<WallpaperItem[]>([]);
   const [page, setPage] = useState(1);
@@ -36,6 +31,11 @@ export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoa
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+
+  const columnWidth = Math.floor((width - 40 - 12) / 2);
+  const cardHeight = Math.floor(columnWidth * (16 / 9));
+  const rowHeight = cardHeight + 12;
 
   // Guard ref to prevent duplicate onEndReached pagination calls
   const loadingRef = useRef(false);
@@ -110,10 +110,10 @@ export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoa
   }, [onWallpaperPress]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({
-    length: ROW_HEIGHT,
-    offset: 12 + ROW_HEIGHT * Math.floor(index / 2),
+    length: rowHeight,
+    offset: 12 + rowHeight * Math.floor(index / 2),
     index,
-  }), []);
+  }), [rowHeight]);
 
   const renderFooter = () => {
     if (!loading) return null;
@@ -146,6 +146,7 @@ export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoa
         <WallpaperCard
           item={item}
           onPress={handlePress}
+          cardWidth={columnWidth}
         />
       )}
     />
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100, // Margin to prevent floating tab bar blocking grid
   },
   row: {
-    justifyContent: 'space-between',
+    gap: 12,
     marginBottom: 12,
   },
   footer: {

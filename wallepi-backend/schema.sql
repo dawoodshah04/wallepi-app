@@ -16,6 +16,9 @@ CREATE INDEX IF NOT EXISTS idx_active     ON wallpapers(is_active);
 CREATE INDEX IF NOT EXISTS idx_created_at ON wallpapers(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_category   ON wallpapers(category);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_filename ON wallpapers(filename);
+CREATE INDEX IF NOT EXISTS idx_wallpapers_feed ON wallpapers(is_active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallpapers_active_cat ON wallpapers(is_active, category, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallpapers_blurhash ON wallpapers(blurhash);
 
 CREATE TABLE IF NOT EXISTS wallpaper_tags (
     wallpaper_id   TEXT NOT NULL REFERENCES wallpapers(id) ON DELETE CASCADE,

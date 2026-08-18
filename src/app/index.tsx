@@ -73,7 +73,7 @@ export default function HomeScreen() {
               return (
                 <Pressable
                   key={cat}
-                  style={[styles.tab, isActive && styles.activeTab]}
+                  style={({ pressed }) => [styles.tab, isActive && styles.activeTab, pressed && styles.tabPressed]}
                   onPress={() => setActiveCategory(catKey)}
                 >
                   <Text style={[styles.tabText, isActive && styles.activeTabText]}>
@@ -132,6 +132,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.backgroundElement,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+  },
+  tabPressed: {
+    transform: [{ scale: 0.94 }],
+    opacity: 0.85,
   },
   activeTab: {
     backgroundColor: '#fff',
