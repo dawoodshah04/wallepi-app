@@ -34,8 +34,6 @@ export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoa
   const { width } = useWindowDimensions();
 
   const columnWidth = Math.floor((width - 40 - 12) / 2);
-  const cardHeight = Math.floor(columnWidth * (16 / 9));
-  const rowHeight = cardHeight + 12;
 
   // Guard ref to prevent duplicate onEndReached pagination calls
   const loadingRef = useRef(false);
@@ -109,11 +107,7 @@ export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoa
     onWallpaperPress(item);
   }, [onWallpaperPress]);
 
-  const getItemLayout = useCallback((_: any, index: number) => ({
-    length: rowHeight,
-    offset: 12 + rowHeight * Math.floor(index / 2),
-    index,
-  }), [rowHeight]);
+
 
   const renderFooter = () => {
     if (!loading) return null;
@@ -141,7 +135,7 @@ export default function WallpaperGrid({ category, onWallpaperPress, onInitialLoa
       maxToRenderPerBatch={10}
       windowSize={11}
       removeClippedSubviews={Platform.OS === 'android'}
-      getItemLayout={getItemLayout}
+
       renderItem={({ item }) => (
         <WallpaperCard
           item={item}
